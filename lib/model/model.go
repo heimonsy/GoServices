@@ -12,7 +12,12 @@ const (
 type Job struct {
 	ID        int       `json:"id,omitempty"`
 	Command   []string  `json:"command,omitempty"`
+	Logs      []string  `json:"logs,omitempty"`
 	Status    string    `json:"status,omitempty"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
+}
+
+type Error struct {
+	Message string `json:"message,omitempty"`
 }

@@ -8,16 +8,20 @@ import (
 	"time"
 
 	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 
 	"github.com/heimonsy/GoServices/lib/model"
 )
 
 func main() {
-	e := echo.New()
 	storage := &Storage{incr: 10000, jobs: make(map[int]*model.Job)}
+	e := echo.New()
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format: "method=${method}, uri=${uri}, status=${status}\n",
+	}))
 
 	// createa job
-	e.POST("/jobs", func(c echo.Context) error {
+	e.POST("/api/jobs", func(c echo.Context) error {
 		var req model.Job
 		if err := c.Bind(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse request error: %s", err))
@@ -30,13 +34,13 @@ func main() {
 	})
 
 	// list job
-	e.GET("/jobs", func(c echo.Context) error {
+	e.GET("/api/jobs", func(c echo.Context) error {
 		jobs := storage.ListJobs()
 		return c.JSON(http.StatusOK, jobs)
 	})
 
 	// get a job
-	e.GET("/jobs/:id", func(c echo.Context) error {
+	e.GET("/api/jobs/:id", func(c echo.Context) error {
 		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse id %s error: %s", c.Param("id"), err))
@@ -113,7 +117,5 @@ func (s *Storage) UpdateJob(id int, status string) error {
 }
 
 func newJsonErrorf(msg string, args ...interface{}) interface{} {
-	return map[string]string{
-		"message": fmt.Sprintf(msg, args...),
-	}
+	return model.Error{Message: fmt.Sprintf(msg, args...)}
 }
