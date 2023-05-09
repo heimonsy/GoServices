@@ -46,8 +46,8 @@ func main() {
 			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse id %s error: %s", c.Param("id"), err))
 		}
 
-		jobs := storage.GetJob(id)
-		return c.JSON(http.StatusOK, jobs)
+		job := storage.GetJob(id)
+		return c.JSON(http.StatusOK, job)
 	})
 
 	// update a job
@@ -61,7 +61,7 @@ func main() {
 			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse request error: %s", err))
 		}
 
-		if err := storage.UpdateJob(id, req.Status); err != nil {
+		if err := storage.UpdateJob(id, req.Status, req.Logs); err != nil {
 			return c.JSON(http.StatusInternalServerError, newJsonErrorf("update job error: %s", err))
 		}
 		return c.NoContent(http.StatusOK)
@@ -104,7 +104,7 @@ func (s *Storage) ListJobs() []model.Job {
 	return jobs
 }
 
-func (s *Storage) UpdateJob(id int, status string) error {
+func (s *Storage) UpdateJob(id int, status string, logs []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	job, ok := s.jobs[id]
@@ -112,6 +112,7 @@ func (s *Storage) UpdateJob(id int, status string) error {
 		return fmt.Errorf("job %d not found", id)
 	}
 	job.Status = status
+	job.Logs = logs
 	job.UpdatedAt = time.Now()
 	return nil
 }
