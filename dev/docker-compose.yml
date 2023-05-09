@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  web-server:
+    build:
+      context: ..
+      dockerfile: service/webserver/Dockerfile
+    ports:
+      - 1323:1323
+
+  job-worker:
+    build:
+      context: ..
+      dockerfile: service/worker/Dockerfile
+    command: ["-server", "web-server"]
