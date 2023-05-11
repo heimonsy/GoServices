@@ -3,6 +3,7 @@ package model
 import "time"
 
 const (
+	JobStatus_Created = "created"
 	JobStatus_Pending = "pending"
 	JobStatus_Running = "running"
 	JobStatus_Done    = "done"

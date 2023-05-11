@@ -67,6 +67,33 @@ func main() {
 		return c.NoContent(http.StatusOK)
 	})
 
+	// update a job
+	e.PUT("/internal/jobs/:id", func(c echo.Context) error {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse id %s error: %s", c.Param("id"), err))
+		}
+		var req model.Job
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse request error: %s", err))
+		}
+
+		if err := storage.UpdateJob(id, req.Status, req.Logs); err != nil {
+			return c.JSON(http.StatusInternalServerError, newJsonErrorf("update job error: %s", err))
+		}
+		return c.NoContent(http.StatusOK)
+	})
+
+	// pop a pending job
+	e.GET("/internal/pop_job", func(c echo.Context) error {
+
+		job := storage.PopPendingJob()
+		if job == nil {
+			return c.NoContent(http.StatusNoContent)
+		}
+		return c.JSON(http.StatusOK, job)
+	})
+
 	e.Logger.Fatal(e.Start(":1323"))
 }
 
@@ -81,7 +108,7 @@ func (s *Storage) CreateJob(job model.Job) model.Job {
 	defer s.mu.Unlock()
 	s.incr++
 	job.ID = s.incr
-	job.Status = model.JobStatus_Pending
+	job.Status = model.JobStatus_Created
 	job.CreatedAt = time.Now()
 	job.UpdatedAt = job.CreatedAt
 	s.jobs[job.ID] = &job
@@ -114,6 +141,23 @@ func (s *Storage) UpdateJob(id int, status string, logs []string) error {
 	job.Status = status
 	job.Logs = logs
 	job.UpdatedAt = time.Now()
+	return nil
+}
+
+// PopJob pops a pending job from the list
+func (s *Storage) PopPendingJob() *model.Job {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, job := range s.jobs {
+		if job.Status != model.JobStatus_Created {
+			continue
+		}
+		job.Status = model.JobStatus_Pending
+		job.UpdatedAt = time.Now()
+		var retJob model.Job
+		retJob = *job
+		return &retJob
+	}
 	return nil
 }
 

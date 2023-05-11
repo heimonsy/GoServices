@@ -21,7 +21,7 @@ var (
 )
 
 const (
-	listJobsAPI  = "/api/jobs"
+	popJobAPI    = "/internal/pop_job"
 	updateJobAPI = "/internal/jobs/%d"
 )
 
@@ -29,19 +29,20 @@ func main() {
 	flag.Parse()
 	tick := time.Tick(3 * time.Second)
 	for range tick {
-		newJobs, err := getNewJobs()
+		newJob, err := getNewJobs()
 		if err != nil {
 			fmt.Printf("get new jobs error: %s\n", err)
 			continue
 		}
-
-		for _, job := range newJobs {
-			go runJob(job)
+		if newJob == nil {
+			continue
 		}
+
+		go runJob(newJob)
 	}
 }
 
-func runJob(job model.Job) {
+func runJob(job *model.Job) {
 	fmt.Printf("received new job: %d\n", job.ID)
 	job.Status = model.JobStatus_Running
 
@@ -51,26 +52,30 @@ func runJob(job model.Job) {
 	}
 
 	logPrintf := func(format string, args ...interface{}) {
-		log := fmt.Sprintf(format, args...)
+		logPrefix := fmt.Sprintf("Job [%d]: ", job.ID)
+		log := logPrefix + fmt.Sprintf(format, args...)
 		job.Logs = append(job.Logs, log)
 		fmt.Println(log)
 	}
 
-	logPrintf("job [%d] starting", job.ID)
-	logPrintf("job [%d] running: %s", job.ID, strings.Join(job.Command, " "))
+	logPrintf("starting")
+	logPrintf("running")
 	cmd := exec.Command(job.Command[0], job.Command[1:]...)
 
 	outputs, err := cmd.CombinedOutput()
 
 	for _, line := range bytes.Split(outputs, []byte("\n")) {
-		job.Logs = append(job.Logs, string(line))
+		if len(line) == 0 {
+			continue
+		}
+		logPrintf(string(line))
 	}
 
 	if err != nil {
-		logPrintf("job [%s] failed: %s", job.ID, err)
+		logPrintf("failed: %s", err)
 		job.Status = model.JobStatus_Failed
 	} else {
-		logPrintf("job [%d] finished", job.ID)
+		logPrintf("finished")
 		job.Status = model.JobStatus_Done
 	}
 
@@ -79,7 +84,7 @@ func runJob(job model.Job) {
 	}
 }
 
-func updateJob(job model.Job) error {
+func updateJob(job *model.Job) error {
 	reqBody, err := json.Marshal(model.Job{
 		ID:     job.ID,
 		Status: job.Status,
@@ -116,12 +121,15 @@ func updateJob(job model.Job) error {
 	return nil
 }
 
-func getNewJobs() ([]model.Job, error) {
-	response, err := http.Get(strings.Join([]string{"http://", *server, ":", strconv.Itoa(*port), listJobsAPI}, ""))
+func getNewJobs() (*model.Job, error) {
+	response, err := http.Get(strings.Join([]string{"http://", *server, ":", strconv.Itoa(*port), popJobAPI}, ""))
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusNoContent {
+		return nil, nil
+	}
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -136,16 +144,10 @@ func getNewJobs() ([]model.Job, error) {
 
 		return nil, fmt.Errorf("get error from server: %s", serverError.Message)
 	}
-	var jobs []model.Job
-	if err := json.Unmarshal(data, &jobs); err != nil {
-		return nil, fmt.Errorf("unmarshal (%s) to jobs error: %s", string(data), err)
-	}
 
-	var retJobs []model.Job
-	for _, job := range jobs {
-		if job.Status == model.JobStatus_Pending {
-			retJobs = append(retJobs, job)
-		}
+	var newJob model.Job
+	if err := json.Unmarshal(data, &newJob); err != nil {
+		return nil, fmt.Errorf("unmarshal (%s) to job error: %s", string(data), err)
 	}
-	return retJobs, nil
+	return &newJob, nil
 }
