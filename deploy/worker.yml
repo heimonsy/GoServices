@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    svc: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      svc: worker
+  template:
+    metadata:
+      name: worker
+      labels:
+        svc: worker
+    spec:
+      containers:
+      - name: web-server
+        image: ghcr.io/heimonsy/goservices:worker-v0.0.1
+        args:
+          - -server
+          - web-server
+          - -port
+          - "1323"
