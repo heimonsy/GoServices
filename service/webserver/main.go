@@ -67,23 +67,6 @@ func main() {
 		return c.NoContent(http.StatusOK)
 	})
 
-	// update a job
-	e.PUT("/internal/jobs/:id", func(c echo.Context) error {
-		id, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse id %s error: %s", c.Param("id"), err))
-		}
-		var req model.Job
-		if err := c.Bind(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, newJsonErrorf("parse request error: %s", err))
-		}
-
-		if err := storage.UpdateJob(id, req.Status, req.Logs); err != nil {
-			return c.JSON(http.StatusInternalServerError, newJsonErrorf("update job error: %s", err))
-		}
-		return c.NoContent(http.StatusOK)
-	})
-
 	// pop a pending job
 	e.GET("/internal/pop_job", func(c echo.Context) error {
 

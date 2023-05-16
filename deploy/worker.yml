@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: web-server
-        image: ghcr.io/heimonsy/goservices:worker-v0.0.1
+        image: ghcr.io/heimonsy/goservices:worker-v0.2.1
         args:
           - -server
           - web-server
